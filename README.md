@@ -7,14 +7,14 @@ Firstly, we use packer to create an **Amazon Machine Image (AMI)** which we woul
 1) Install [packer](https://packer.io/downloads.html) if not already installed.
 2) After installation, verify that packer was installed by typing **packer** in your terminal. You should see an output that shows how to use packer and its available commands.
 3) Create a **packer.json** file (you can name it anything you like) and write in it the configurations you want packer to use i.e: builders, provisioners, etc. For the purpose of this task, I have an already set up packer.json file. Go ahead to clone this repo and continue with the steps below.
-4) Since we are using ansible, we would need to write a script to provision our AMI with ansible so as to be able to provision our AMI with Ansible using a playbook. In this repo, there is an **ansible.sh** script which we can use to install Ansible in our AMI.
+4) Since we are using ansible, we would need to write a script to provision our AMI with ansible so as to be able to provision our AMI with Ansible using a playbook. In this repo, there is an **ansible.sh** script already provided which we can use to install Ansible in our AMI.
 5) You would also need to create an Ansible playbook file with a list of your plays as needed to provision your AMI. I have written a play with serveral tasks in my **ansible.yml** file to update my Ubuntu AMI and install some necessary packages like nodejs, certbot, pm2, etc. I included several descriptive comments in the playbook to explain each task and what it does.
 The packages installed are:
 - [PM2](https://www.npmjs.com/package/pm2) is a process manager for the JavaScript runtime Node.js. It allows you to keep applications alive forever, to reload them without downtime and to facilitate common system admin tasks. I chose this because my application is written with nodeJs and javascript.
 - [Let’s Encrypt](https://letsencrypt.org/) is designed to provide free, automated, and open security certificate authority (CA) for everyone. It enables website owners to get security certificates within minutes.
 - [Certbot](https://certbot.eff.org/) automatically enables HTTPS on your website with EFF's Certbot, deploying Let's Encrypt certificates.
 - [Nginx](https://www.linode.com/docs/web-servers/nginx/use-nginx-reverse-proxy/) A reverse proxy is a server that sits between internal applications and external clients, forwarding client requests to the appropriate server. While many common applications, such as Node.js, are able to function as servers on their own, NGINX has a number of advanced load balancing, security, and acceleration features that most specialized applications lack. Using NGINX as a reverse proxy enables you to add these features to any application.
-6) Export your environment variables (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY) like so: 
+6) Export your environment variables (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY) by running these commands in your terminal: 
 - `export AWS_ACCESS_KEY_ID="your_aws_access_key"`
 - `export AWS_SECRET_ACCESS_KEY="your_aws_secret_key"`
 7) Proceed to build your AMI with the packer.json file: `packer build packer.json`
