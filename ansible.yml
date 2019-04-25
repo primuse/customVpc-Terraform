@@ -56,14 +56,13 @@
     #CDs into the cloned application directory and installs dependencies
     #Also uses PM2 to start the application in the background
     - name: Install App dependencies and start app
-      shell:
-        cmd: |
-          npm install
-          echo ""
-          pm2 start npm -- start
-          pm2 startup
-          env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u ubuntu --hp /home/ubuntu
-          pm2 save
+      shell: |
+        npm install
+        echo ""
+        pm2 start npm -- start
+        pm2 startup
+        env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u ubuntu --hp /home/ubuntu
+        pm2 save
       args:
         chdir: /home/ubuntu/documents/SendIt-React/
 
@@ -90,17 +89,16 @@
 
     #Creates my custom NGINX configuration file
     - name: Create custom NGINX config file 
-      shell:
-        cmd: |
-          cat > /etc/nginx/sites-available/sendit <<EOF
-            server {
-              listen 80;
-              server_name localhost sendit-ah.gq www.sendit-ah.gq;
-              location / {
-                proxy_pass  http://127.0.0.1:3000;
-              }
+      command: |
+        bash -c 'cat > /etc/nginx/sites-available/sendit <<EOF
+          server {
+            listen 80;
+            server_name localhost sendit-ah.gq www.sendit-ah.gq;
+            location / {
+              proxy_pass  http://127.0.0.1:3000;
             }
-          EOF
+          }
+        EOF'
     
     #Creates a symlink between the custom file in sites_available directory to sites_enabled directory
     #and restarts the NGINX server
