@@ -1,0 +1,121 @@
+---
+- hosts: all
+  remote_user: ubuntu
+  become: yes
+
+  #Handler to restart NGINX service when it has been notified below
+  handlers: 
+    - name: restart nginx
+      service: 
+        name: nginx
+        state: restarted
+
+#Various tasks in this play 
+  tasks:
+    #Installs Nodejs
+    - name: Install the gpg key for nodejs LTS
+      apt_key:
+        url: "https://deb.nodesource.com/gpgkey/nodesource.gpg.key"
+        state: present
+
+    - name: Install the nodejs LTS repo
+      apt_repository:
+        repo: "deb https://deb.nodesource.com/node_10.x bionic main"
+        state: present
+        update_cache: yes
+
+    - name: Install nodejs
+      apt:
+        name: nodejs
+        state: present
+    
+    #Installs Nginx
+    - name: Install Nginx
+      apt: 
+        name: nginx
+    
+    #Installs PM2    
+    - name: Install PM2
+      npm:
+        name: pm2
+        state: latest
+        global: yes
+
+    #Creates a directory Documents
+    - name: Create directory documents
+      file:
+        path: /home/ubuntu/documents
+        state: directory
+    
+    #Clones the repo that houses my application
+    - name: Clone Github repository
+      git:
+        repo: https://github.com/primuse/SendIt-API.git
+        dest: "/home/ubuntu/documents/SendIt-API"
+
+    #Removes the default NGINX configuration files
+    - name: Remove NGINX default files
+      file: 
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - /etc/nginx/sites-enabled/default
+        - /etc/nginx/sites-available/default
+
+    #Checks if a custom file 'sendit' already exists, if yes, deletes it
+    - name: Check if custom file already exists and delete if found
+      file: 
+        path: /etc/nginx/sites-available/sendit-api
+        state: absent
+
+    #Changes the owner of the sites_available directory to ubuntu
+    - name: Change ownership of sites_available directory
+      file: 
+        path: /etc/nginx/sites-available
+        owner: ubuntu
+
+    #Creates my custom NGINX configuration file
+    - name: Create custom NGINX config file 
+      command: |
+        bash -c 'cat > /etc/nginx/sites-available/sendit-api <<EOF
+          server {
+            listen 80;
+            server_name localhost sendit-ah.gq www.sendit-ah.gq;
+            location / {
+              proxy_pass  http://127.0.0.1:3000;
+            }
+          }
+        EOF'
+    
+    #Creates a symlink between the custom file in sites_available directory to sites_enabled directory
+    #and restarts the NGINX server
+    - name: Create symlink between sites_available and sites_enabled
+      file: 
+        src: /etc/nginx/sites-available/sendit-api
+        dest: /etc/nginx/sites-enabled/sendit-api
+        state: link
+      notify:
+      - restart nginx
+
+    #Installs Certbot to obtain and install SSL certificates
+    - name: Install software-properties
+      apt:
+        name: software-properties-common
+        state: present
+
+    - name: Add certbot repository
+      apt_repository:
+        repo: 'ppa:certbot/certbot'
+        state: present
+        update_cache: yes
+
+    - name: Install certbot's Nginx package
+      apt:
+        name: python-certbot-nginx
+        state: present
+
+
+
+
+      
+
