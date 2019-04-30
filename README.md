@@ -1,4 +1,4 @@
-# DEPLOY SIMS CHECKPOINT WITH PACKER AND [ANSIBLE](https://www.ansible.com/)
+# DEPLOY SIMS CHECKPOINT WITH FRONTEND ON A PUBLIC SUBNET AND API ON A PRIVATE SUBNET
 
 This guide assumes you already have an AWS account however if you do not, go to https://aws.amazon.com/ to quickly create one. After doing so, you can continue with the steps listed below.
 
