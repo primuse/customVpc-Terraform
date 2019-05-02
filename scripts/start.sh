@@ -3,12 +3,19 @@
 #Installs necessary repos and packages to set up ansible
 function startApp {
   cd /home/ubuntu/documents/SendIt-API/
-  export PORT=3000
-  export DATABASE_URI ='postgres://aojkrtow:vSRWOEClsSReLdp3ly6i2cZQYcIwO_dl@isilo.db.elephantsql.com:5432/aojkrtow'
-  export SENDGRID_API_KEY='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'
-  export secret='belvinosa'
+  sudo chown -R $(whoami) /home/ubuntu/documents/SendIt-API/
   echo "======================== Installing Dependencies =================="
-  npm install
+  cat > /home/ubuntu/documents/SendIt-API/.env <<EOF
+  PORT=3000
+  DATABASE_URI=postgresql://postgres:@3.14.213.254:5432/sendit
+  SENDGRID_API_KEY=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
+  secret=belvinosa
+EOF
+
+  cat .env
+  sudo npm config set user 0
+  sudo npm config set unsafe-perm true
+  sudo npm install
   echo "======================== Dependencies Installed =================="
   echo "======================== Starting App =================="
   pm2 start npm -- start

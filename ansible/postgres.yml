@@ -1,0 +1,50 @@
+---
+- hosts: all
+  become_method: sudo
+  become: yes
+  remote_user: ubuntu
+
+  #Handler to restart NGINX service when it has been notified below
+  handlers: 
+    - name: restart postgresql
+      service: 
+        name: postgresql
+        state: restarted
+
+  tasks:
+    - name: Update cache
+      apt:
+        update_cache: yes
+
+    #   Installing postgreSQL
+    - name: Update system and add postgres repo
+      command: |
+        sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" >> /etc/apt/sources.list.d/pgdg.list' &&
+        wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+        sudo apt-get update
+    - name: Install PostgreSQL
+      apt:
+        name: ['postgresql','postgresql-contrib', 'python-psycopg2']
+      tags: packages
+      notify:
+        - restart postgresql
+
+      # Create database
+    - name: Create database
+      sudo_user: postgres
+      postgresql_db: name=sendit
+        encoding='UTF-8'
+        lc_collate='en_US.UTF-8'
+        lc_ctype='en_US.UTF-8'
+        template='template0'
+        state=present
+    # Modify postgresql config file to remote connection
+    - name: Edit postgresql.conf file
+      shell: |
+          sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/gi" /etc/postgresql/10/main/postgresql.conf
+          systemctl restart postgresql
+      # Modify pg_hba config file to allow remote connection
+    - name: Edit pg_hba.conf file
+      shell: |
+          echo "hostnossl  all  all  10.0.1.0/24  trust" >> /etc/postgresql/10/main/pg_hba.conf
+          systemctl restart postgresql
