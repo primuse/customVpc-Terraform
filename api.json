@@ -22,7 +22,7 @@
       },
       "instance_type": "t2.micro",
       "ssh_username": "ubuntu",
-      "ami_name": "SendIt-Database {{timestamp}}"
+      "ami_name": "SendIt-Api"
     }
   ],
   "provisioners": [
@@ -32,7 +32,7 @@
     },
     {
       "type": "ansible-local",
-      "playbook_file": "ansible/postgres.yml"
+      "playbook_file": "ansible/api.yml"
     }
   ]
 }

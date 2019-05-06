@@ -22,7 +22,7 @@
       },
       "instance_type": "t2.micro",
       "ssh_username": "ubuntu",
-      "ami_name": "SendIt-Api {{timestamp}}"
+      "ami_name": "SendIt-Public"
     }
   ],
   "provisioners": [
@@ -32,11 +32,7 @@
     },
     {
       "type": "ansible-local",
-      "playbook_file": "ansible/api.yml"
-    },
-    {
-      "type": "shell",
-      "scripts": "scripts/start.sh"
+      "playbook_file": "./ansible/frontend.yml"
     }
   ]
 }
