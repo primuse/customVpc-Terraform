@@ -25,7 +25,7 @@ function createFrontendAmi {
   packer build frontend.json
 }
 
-Builds infrastructure and Launches instances with Terraform
+#Builds infrastructure and Launches instances with Terraform
 function terraformLaunch {
   cd terraform
   terraform init -input=false
