@@ -24,6 +24,7 @@ resource "aws_subnet" "us-east-2a-public" {
 
     cidr_block = "${var.cidr_public_subnet}"
     availability_zone = "us-east-2a"
+    map_public_ip_on_launch = true
 
     tags {
         Name = "Sendit_Public_Subnet"

@@ -46,17 +46,3 @@ resource "aws_instance" "database" {
     Name = "sendit_database"
   }
 }
-
-# Create the ec2 instance for the bastion host
-resource "aws_instance" "bastion" {
-  ami                    = "ami-033a0960d9d83ead0"
-  availability_zone      = "us-east-2a"
-  instance_type          = "t2.micro"
-  key_name               = "${var.key_pair}"
-  vpc_security_group_ids = ["${aws_security_group.bastion.id}"]
-  subnet_id              = "${aws_subnet.us-east-2a-public.id}"
-
-  tags {
-    Name = "sendit_bastion_host"
-  }
-}

@@ -2,7 +2,7 @@
 resource "aws_elb" "public" {
   name               = "sendit-public-elb"
   internal           = false
-  security_groups    = ["${aws_security_group.elb.id}"]
+  security_groups    = ["${aws_security_group.public_elb.id}"]
   subnets            = ["${aws_subnet.us-east-2a-public.id}"]
 
   listener {
@@ -34,7 +34,7 @@ resource "aws_elb" "public" {
 resource "aws_elb" "private" {
   name               = "sendit-private-elb"
   internal           = true
-  security_groups    = ["${aws_security_group.elb.id}"]
+  security_groups    = ["${aws_security_group.private_elb.id}"]
   subnets            = ["${aws_subnet.us-east-2a-private.id}"]
 
   listener {

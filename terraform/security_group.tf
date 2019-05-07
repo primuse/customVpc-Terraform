@@ -6,14 +6,14 @@ resource "aws_security_group" "private" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    security_groups = ["${aws_security_group.elb.id}"]
+    security_groups = ["${aws_security_group.private_elb.id}"]
   }
 
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["${aws_instance.bastion.private_ip}/32"]
+    cidr_blocks = ["${aws_instance.nat.private_ip}/32"]
   }
 
   ingress {
@@ -21,6 +21,27 @@ resource "aws_security_group" "private" {
     to_port     = 3000
     protocol    = "tcp"
     cidr_blocks = ["${var.cidr_public_subnet}"]
+  }
+
+  ingress {
+    from_port = -1
+    to_port = -1
+    protocol = "icmp"
+    cidr_blocks = ["${var.cidr_vpc}"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["${var.cidr_public_subnet}"]
+  }
+
+  egress {
+    from_port = -1
+    to_port = -1
+    protocol = "icmp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   vpc_id = "${aws_vpc.main.id}"
@@ -38,20 +59,34 @@ resource "aws_security_group" "public" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    security_groups = ["${aws_security_group.elb.id}"]
+    security_groups = ["${aws_security_group.public_elb.id}"]
   }
 
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["${aws_instance.bastion.private_ip}/32"]
+    cidr_blocks = ["${aws_instance.nat.private_ip}/32"]
   }
 
   ingress {
     from_port   = 3000
     to_port     = 3000
     protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port = -1
+    to_port = -1
+    protocol = "icmp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -70,7 +105,7 @@ resource "aws_security_group" "database" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["${aws_instance.bastion.private_ip}/32"]
+    cidr_blocks = ["${aws_instance.nat.private_ip}/32"]
   }
 
   ingress {
@@ -80,6 +115,27 @@ resource "aws_security_group" "database" {
     cidr_blocks = ["${var.cidr_private_subnet}"]
   }
 
+  ingress {
+    from_port = -1
+    to_port = -1
+    protocol = "icmp"
+    cidr_blocks = ["${var.cidr_vpc}"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["${var.cidr_private_subnet}"]
+  }
+
+  egress {
+    from_port = -1
+    to_port = -1
+    protocol = "icmp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   vpc_id = "${aws_vpc.main.id}"
 
   tags {
@@ -87,28 +143,40 @@ resource "aws_security_group" "database" {
   }
 }
 
-resource "aws_security_group" "bastion" {
-  name        = "sendit_bastion_sg"
-  description = "Security group for the Bastion Host"
+resource "aws_security_group" "private_elb" {
+  name        = "sendit_private_elb_sg"
+  description = "Security group for the private Elastic load balancer"
 
   # inbound traffic
   ingress {
-    from_port   = 22
-    to_port     = 22
+    from_port   = 80
+    to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["172.16.0.0/16"]
   }
 
   vpc_id = "${aws_vpc.main.id}"
 
   tags = {
-    Name = "sendit_bastion_sg"
+    Name = "sendit_private_elb_sg"
   }
 }
 
-resource "aws_security_group" "elb" {
-  name        = "sendit_elb_sg"
-  description = "Security group for the Elastic load balancer"
+# this rule depends on both security groups so separating it allows it
+# to be created after both
+resource "aws_security_group_rule" "extra_rule1" {
+  security_group_id        = "${aws_security_group.private_elb.id}"
+  from_port                = 80
+  to_port                  = 80
+  protocol                 = "tcp"
+  type                     = "egress"
+  source_security_group_id = "${aws_security_group.private.id}"
+}
+
+
+resource "aws_security_group" "public_elb" {
+  name        = "sendit_public_elb_sg"
+  description = "Security group for the public Elastic load balancer"
 
   # inbound traffic
   ingress {
@@ -121,8 +189,17 @@ resource "aws_security_group" "elb" {
   vpc_id = "${aws_vpc.main.id}"
 
   tags = {
-    Name = "sendit_elb_sg"
+    Name = "sendit_public_elb_sg"
   }
+}
+
+resource "aws_security_group_rule" "extra_rule2" {
+  security_group_id        = "${aws_security_group.public_elb.id}"
+  from_port                = 80
+  to_port                  = 80
+  protocol                 = "tcp"
+  type                     = "egress"
+  source_security_group_id = "${aws_security_group.public.id}"
 }
 
 resource "aws_security_group" "nat" {
@@ -142,11 +219,19 @@ resource "aws_security_group" "nat" {
         cidr_blocks = ["${var.cidr_private_subnet}"]
     }
     ingress {
-        from_port = 22
-        to_port = 22
-        protocol = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
     }
+
+    ingress {
+      from_port = -1
+      to_port = -1
+      protocol = "icmp"
+      cidr_blocks = ["${var.cidr_private_subnet}"]
+    }
+
 
     egress {
         from_port = 80
@@ -159,6 +244,20 @@ resource "aws_security_group" "nat" {
         to_port = 443
         protocol = "tcp"
         cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    egress {
+      from_port = 22
+      to_port = 22
+      protocol = "tcp"
+      cidr_blocks = ["${var.cidr_vpc}"]
+    }
+
+    egress {
+      from_port   = -1
+      to_port     = -1
+      protocol    = "icmp"
+      cidr_blocks = ["0.0.0.0/0"]
     }
 
     vpc_id = "${aws_vpc.main.id}"

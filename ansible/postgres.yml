@@ -46,5 +46,5 @@
       # Modify pg_hba config file to allow remote connection
     - name: Edit pg_hba.conf file
       shell: |
-          echo "hostnossl  all  all  10.0.1.0/24  trust" >> /etc/postgresql/10/main/pg_hba.conf
+          echo "host  all  all  172.16.2.0/24  trust" >> /etc/postgresql/10/main/pg_hba.conf
           systemctl restart postgresql
