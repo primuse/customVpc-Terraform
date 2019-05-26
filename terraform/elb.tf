@@ -1,9 +1,9 @@
 # Create a new load balancer for the frontend instance
 resource "aws_elb" "public" {
-  name               = "sendit-public-elb"
-  internal           = false
-  security_groups    = ["${aws_security_group.public_elb.id}"]
-  subnets            = ["${aws_subnet.us-east-2a-public.id}"]
+  name            = "sendit-public-elb"
+  internal        = false
+  security_groups = ["${aws_security_group.public_elb.id}"]
+  subnets         = ["${aws_subnet.us-east-1a-public.id}"]
 
   listener {
     instance_port     = 80
@@ -32,10 +32,10 @@ resource "aws_elb" "public" {
 
 # Create a new load balancer for the api instance
 resource "aws_elb" "private" {
-  name               = "sendit-private-elb"
-  internal           = true
-  security_groups    = ["${aws_security_group.private_elb.id}"]
-  subnets            = ["${aws_subnet.us-east-2a-private.id}"]
+  name            = "sendit-private-elb"
+  internal        = true
+  security_groups = ["${aws_security_group.private_elb.id}"]
+  subnets         = ["${aws_subnet.us-east-1a-private.id}"]
 
   listener {
     instance_port     = 80

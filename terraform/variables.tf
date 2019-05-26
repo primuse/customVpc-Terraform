@@ -1,8 +1,9 @@
 variable "AWS_ACCESS_KEY_ID" {}
 variable "AWS_SECRET_ACCESS_KEY" {}
+
 variable "aws_region" {
   description = "EC2 Region for the VPC"
-  default = "us-east-2"
+  default     = "us-east-1"
 }
 
 variable "key_pair" {}

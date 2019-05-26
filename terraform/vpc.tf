@@ -1,6 +1,6 @@
 # Creates a virtual private network
 resource "aws_vpc" "main" {
-  cidr_block       = "${var.cidr_vpc}"
+  cidr_block           = "${var.cidr_vpc}"
   enable_dns_hostnames = true
 
   tags = {
@@ -10,45 +10,44 @@ resource "aws_vpc" "main" {
 
 # Creates an internet gateway
 resource "aws_internet_gateway" "default" {
-    vpc_id = "${aws_vpc.main.id}"
+  vpc_id = "${aws_vpc.main.id}"
 }
-
 
 /*
   ================= Public Subnet ==================
 */
 
 # Creates the public subnet
-resource "aws_subnet" "us-east-2a-public" {
-    vpc_id = "${aws_vpc.main.id}"
+resource "aws_subnet" "us-east-1a-public" {
+  vpc_id = "${aws_vpc.main.id}"
 
-    cidr_block = "${var.cidr_public_subnet}"
-    availability_zone = "us-east-2a"
-    map_public_ip_on_launch = true
+  cidr_block              = "${var.cidr_public_subnet}"
+  availability_zone       = "us-east-1a"
+  map_public_ip_on_launch = true
 
-    tags {
-        Name = "Sendit_Public_Subnet"
-    }
+  tags {
+    Name = "Sendit_Public_Subnet"
+  }
 }
 
 # Creates the public subnet route table
-resource "aws_route_table" "us-east-2a-public" {
-    vpc_id = "${aws_vpc.main.id}"
+resource "aws_route_table" "us-east-1a-public" {
+  vpc_id = "${aws_vpc.main.id}"
 
-    route {
-        cidr_block = "0.0.0.0/0"
-        gateway_id = "${aws_internet_gateway.default.id}"
-    }
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = "${aws_internet_gateway.default.id}"
+  }
 
-    tags {
-        Name = "public_subnet_rt"
-    }
+  tags {
+    Name = "public_subnet_rt"
+  }
 }
 
 # Creates the public subnet route table association
-resource "aws_route_table_association" "us-east-2a-public" {
-    subnet_id = "${aws_subnet.us-east-2a-public.id}"
-    route_table_id = "${aws_route_table.us-east-2a-public.id}"
+resource "aws_route_table_association" "us-east-1a-public" {
+  subnet_id      = "${aws_subnet.us-east-1a-public.id}"
+  route_table_id = "${aws_route_table.us-east-1a-public.id}"
 }
 
 /*
@@ -56,34 +55,33 @@ resource "aws_route_table_association" "us-east-2a-public" {
 */
 
 # Creates the private subnet
-resource "aws_subnet" "us-east-2a-private" {
-    vpc_id = "${aws_vpc.main.id}"
+resource "aws_subnet" "us-east-1a-private" {
+  vpc_id = "${aws_vpc.main.id}"
 
-    cidr_block = "${var.cidr_private_subnet}"
-    availability_zone = "us-east-2a"
+  cidr_block        = "${var.cidr_private_subnet}"
+  availability_zone = "us-east-1a"
 
-    tags {
-        Name = "Sendit_Private_Subnet"
-    }
+  tags {
+    Name = "Sendit_Private_Subnet"
+  }
 }
 
 # Creates the private subnet route table
-resource "aws_route_table" "us-east-2a-private" {
-    vpc_id = "${aws_vpc.main.id}"
+resource "aws_route_table" "us-east-1a-private" {
+  vpc_id = "${aws_vpc.main.id}"
 
-    route {
-        cidr_block = "0.0.0.0/0"
-        instance_id = "${aws_instance.nat.id}"
-    }
+  route {
+    cidr_block  = "0.0.0.0/0"
+    instance_id = "${aws_instance.nat.id}"
+  }
 
-    tags {
-        Name = "private_subnet_rt" 
-    }
+  tags {
+    Name = "private_subnet_rt"
+  }
 }
 
 # Creates the private subnet route table association
-resource "aws_route_table_association" "us-east-2a-private" {
-    subnet_id = "${aws_subnet.us-east-2a-private.id}"
-    route_table_id = "${aws_route_table.us-east-2a-private.id}"
+resource "aws_route_table_association" "us-east-1a-private" {
+  subnet_id      = "${aws_subnet.us-east-1a-private.id}"
+  route_table_id = "${aws_route_table.us-east-1a-private.id}"
 }
-

@@ -1,28 +1,24 @@
 #!/usr/bin/env bash
 
-accessKey=$1
-secretKey=$2
-
 #Creates the Api AMI
 function createApiAmi {
   cd ..
-  export AWS_ACCESS_KEY_ID=$accessKey
-  export AWS_SECRET_ACCESS_KEY=$secretKey
-  packer build api.json
+  packer build -var-file=variables.json api.json
 }
 
 #Creates the database AMI
 function createDatabaseAmi {
-  export AWS_ACCESS_KEY_ID=$accessKey
-  export AWS_SECRET_ACCESS_KEY=$secretKey
-  packer build database.json
+  packer build -var-file=variables.json database.json
 }
 
 #Creates the frontend AMI
 function createFrontendAmi {
-  export AWS_ACCESS_KEY_ID=$accessKey
-  export AWS_SECRET_ACCESS_KEY=$secretKey
-  packer build frontend.json
+  packer build -var-file=variables.json frontend.json
+}
+
+#Creates the NAT AMI
+function createNatAmi {
+  packer build -var-file=variables.json NAT.json
 }
 
 #Builds infrastructure and Launches instances with Terraform
@@ -38,6 +34,7 @@ function main {
   createApiAmi
   createDatabaseAmi
   createFrontendAmi
+  createNatAmi
   terraformLaunch
 }
 

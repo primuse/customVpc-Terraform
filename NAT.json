@@ -18,17 +18,13 @@
       },
       "instance_type": "t2.micro",
       "ssh_username": "ubuntu",
-      "ami_name": "SendIt-Public"
+      "ami_name": "SendIt-NAT"
     }
   ],
   "provisioners": [
     {
       "type": "shell",
-      "scripts": "scripts/ansible.sh"
-    },
-    {
-      "type": "ansible-local",
-      "playbook_file": "./ansible/frontend.yml"
+      "scripts": "scripts/nat.sh"
     }
   ]
 }

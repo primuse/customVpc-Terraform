@@ -5,3 +5,4 @@ terraform/terraform.tfstate.backup
 terraform.tfstate
 terraform/.terraform.tfstate.lock.info
 terraform/tfplan
+variables.json

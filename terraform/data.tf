@@ -60,3 +60,24 @@ data "aws_ami" "sendit_frontend" {
 
   owners = ["self"]
 }
+
+data "aws_ami" "sendit_nat" {
+  most_recent = true
+
+  filter {
+    name   = "name"
+    values = ["SendIt-NAT"] # Filter ami with the value 'SendIt-NAT' and gets the latest one"
+  }
+
+  filter {
+    name = "root-device-type"
+    values = ["ebs"]
+  }
+
+  filter {
+    name = "virtualization-type"
+    values = ["hvm"]
+  }
+
+  owners = ["self"]
+}
