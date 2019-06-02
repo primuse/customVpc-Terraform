@@ -1,72 +1,381 @@
-# DEPLOY SIMS CHECKPOINT WITH FRONTEND ON A PUBLIC SUBNET AND API ON A PRIVATE SUBNET
+# Create a Custom Network for your Checkpoint
 
-This guide assumes you already have an AWS account however if you do not, go to https://aws.amazon.com/ to quickly create one. After doing so, you can continue with the steps listed below.
+## Technologies Used
+- [Packer](https://packer.io/downloads.html)
+- [Terraform](https://www.terraform.io/)
+- [Ansible](https://aws.amazon.com/)
+- [AWS](https://aws.amazon.com/)
 
-N/B: If you haven’t purchased a domain name, proceed to do so now or you can visit freenom to register a free one.
+## Introduction
+This repository automates the creation of a VPC(Virtual Private Cloud), a Public and Private subnet, Internet gateway, NAT instance, Route tables e.t.c. The application backend (API) and database reside in a private subnet(not accessible via the internet) while the frontend resides in a public subnet (accessible via the internet).
 
-Firstly, we use packer to create an **Amazon Machine Image (AMI)** which we would use to host our application.
-## Creating AMI Image
-1) Install [packer](https://packer.io/downloads.html) if not already installed.
-2) After installation, verify that packer was installed by typing **packer** in your terminal. You should see an output that shows how to use packer and its available commands.
-3) Create a **packer.json** file (you can name it anything you like) and write in it the configurations you want packer to use i.e: builders, provisioners, etc. A packer.json file is a configuration file where we list the builder configurations (what packer would use to build the AMI) and the provisioner configurations (what packer would use to provision the AMI). For the purpose of this task, I have an already set up packer.json file. Go ahead to clone this repo and continue with the steps below.
-4) Since we are using ansible, we would need to write a script to install ansible on our AMI so as to be able to provision it using Ansible. In this repo, there is an **ansible.sh** script already provided which we can use to install Ansible in our AMI.
-5) You would also need to create an Ansible playbook file with a list of your plays(tasks) as needed to provision your AMI. I have written a play with serveral tasks in my **ansible.yml** file to update my Ubuntu AMI and install some necessary packages like nodejs, certbot, pm2, etc. I included several descriptive comments in the playbook to explain each task and what it does.
+In this repo, there are four packer files, for the frontend, backend, database and NAT instance respectively. These packer files are used to build and provision the AMIs we would use as base images for our instances.
+
+### Packer file for the database 
+This file builds an AMI for the database instance and provisons it with the `postgres.yml` file found in the **ansible** folder. The `postgres.yml` file installs postgres (the database the application uses), creates a new database and edits the configuration file to allow remote connections to the database.
+
+### Packer file for the frontend
+This file builds an AMI for the frontend instance and provisons it with the `frontend.yml` file found in the **ansible** folder. The `frontend.yml` file updates the Ubuntu AMI, clone the repo hosting the frontend app and installs some necessary packages like nodejs, certbot, pm2, etc. I included several descriptive comments in the playbook to explain each task and what it does.
 The packages installed are:
 - [PM2](https://www.npmjs.com/package/pm2) is a process manager for the JavaScript runtime Node.js. It allows you to keep applications alive forever, to reload them without downtime and to facilitate common system admin tasks. I chose this because my application is written with nodeJs and javascript.
 - [Let’s Encrypt](https://letsencrypt.org/) is designed to provide free, automated, and open security certificate authority (CA) for everyone. It enables website owners to get security certificates within minutes.
 - [Certbot](https://certbot.eff.org/) automatically enables HTTPS on your website with EFF's Certbot, deploying Let's Encrypt certificates.
 - [Nginx](https://www.linode.com/docs/web-servers/nginx/use-nginx-reverse-proxy/) A reverse proxy is a server that sits between internal applications and external clients, forwarding client requests to the appropriate server. While many common applications, such as Node.js, are able to function as servers on their own, NGINX has a number of advanced load balancing, security, and acceleration features that most specialized applications lack. Using NGINX as a reverse proxy enables you to add these features to any application.
-6) Go to the **ansible.yml** file to replace the domain names in the nginx configuration with your domain and subdomain names. i.e:
+
+### Packer file for the backend
+This file builds an AMI for the frontend instance and provisons it with the `api.yml` file found in the **ansible** folder. The `api.yml` file updates the Ubuntu AMI, clone the repo hosting the backend app and installs the same packages as with the frontend application.
+
+### Packer file for the NAT instance
+This file builds an AMI for the NAT instance and provisons it with the `nat.sh` script found in the **scripts** folder. The `nat.sh` file enables **IPv4 forwarding** and **Masquerade** for this instance. This is necessary to enable this instance serve as a **NAT gateway**, forwarding traffic from instances in a private subnet to the iternet but not allowing traffic from the internet to the private subnet.
+
+After the AMIs have been built and provisioned, **terraform** is used to automatically build our infrastructure. Terraform configuration is described using a high-level configuration syntax. The terraform configurations can be found in the **terraform** folder.
+
+### Variables file
+This file holds all the variables used by this terraform configuration. It also provides a default value that is used if no value was provided. The `AWS_ACCESS_KEY_ID` and the `AWS_SECRET_ACCESS_KEY` variables hold the aws authentication keys of the aws account you want to use to build your infrastructure.
+
+### Vpc file
+This file holds configurations used to create a **VPC**- A Virtual Private Cloud (VPC) lets you provision a logically isolated section of the AWS Cloud where you can launch AWS resources in a virtual network that you define. It also holds the configuration that creates the **private** and **public** subnet. A subnet is a logical partition of an IP network into multiple, smaller network segments. It is typically used to subdivide large networks into smaller, more efficient subnetworks. Route tables are also created to define how traffic would be routed from each subnet. Traffic from the Public subnet would be routed to the **internet gateway** while traffic from the Private subnet routed to the **NAT instance**. **Route table associations** are used to associate each route table to a specific subnet. All these configurations are declared and described in this file. *There are descriptive comments that would help you understand each code block*.
+
+### Security groups
+The **security group** acts as a virtual **firewall** for your instance to control **inbound and outbound** traffic. When you launch an instance in a VPC, you can assign up to five security groups to the instance. 
+In this file we declare security groups for the 
+**priavte subnet**:
+
 ```
-server {
-    listen 80;
-    server_name localhost sendit-ah.gq www.sendit-ah.gq;
-    location / {
-        proxy_pass http://127.0.0.1:3000;
+resource "aws_security_group" "private" {
+  name        = "sendit_private_sg"
+  description = "Security group for private instances"
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    security_groups = ["${aws_security_group.private_elb.id}"]
+  }
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["${aws_instance.nat.private_ip}/32"]
+  }
+
+  ingress {
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
+    cidr_blocks = ["${var.cidr_public_subnet}"]
+  }
+
+  ingress {
+    from_port = -1
+    to_port = -1
+    protocol = "icmp"
+    cidr_blocks = ["${var.cidr_vpc}"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["${var.cidr_public_subnet}"]
+  }
+
+  egress {
+    from_port = -1
+    to_port = -1
+    protocol = "icmp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  vpc_id = "${aws_vpc.main.id}"
+
+  tags {
+    Name = "sendit_private_sg"
+  }
+}
+```
+This allows **http** traffic on port `80` only from the **private Load Balancer**, **ssh** traffic on port `22` only from the **NAT** instance, traffic on port `3000` only from the **public subnet**, and it allows outgoing traffic only to the public subnet. This rule secures our private instances in the private subnet to make sure they are not accessible from outside the public subnet.
+
+**public subnet**
+
+```
+resource "aws_security_group" "public" {
+  name        = "sendit_public_sg"
+  description = "Security group for public instances"
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    security_groups = ["${aws_security_group.public_elb.id}"]
+  }
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["${aws_instance.nat.private_ip}/32"]
+  }
+
+  ingress {
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port = -1
+    to_port = -1
+    protocol = "icmp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  vpc_id = "${aws_vpc.main.id}"
+
+  tags {
+    Name = "sendit_public_sg"
+  }
+}
+```
+Since the public subnet hosts our frontend application, it is to be accessible from anywhere. Hence we allow traffic in and out from anywhere but **ssh** only from the **NAT** instance which also serves as a **bastion host** or **jumpbox**.
+
+**databse**
+
+```
+resource "aws_security_group" "database" {
+  name        = "sendit_database_sg"
+  description = "Security group for database instances"
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["${aws_instance.nat.private_ip}/32"]
+  }
+
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["${var.cidr_private_subnet}"]
+  }
+
+  ingress {
+    from_port = -1
+    to_port = -1
+    protocol = "icmp"
+    cidr_blocks = ["${var.cidr_vpc}"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["${var.cidr_private_subnet}"]
+  }
+
+  egress {
+    from_port = -1
+    to_port = -1
+    protocol = "icmp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  vpc_id = "${aws_vpc.main.id}"
+
+  tags {
+    Name = "sendit_database_sg"
+  }
+}
+```
+The database security group only allows **ssh** from the **NAT instance** and traffic on port `5432` from the private subnet. This way it is not accessible from anywhere outside the priavte subnet.
+
+**Private (internal-facing) loadbalancer**
+
+```
+resource "aws_security_group" "private_elb" {
+  name        = "sendit_private_elb_sg"
+  description = "Security group for the private Elastic load balancer"
+
+  # inbound traffic
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["172.16.0.0/16"]
+  }
+
+  vpc_id = "${aws_vpc.main.id}"
+
+  tags = {
+    Name = "sendit_private_elb_sg"
+  }
+}
+
+# this rule depends on both security groups so separating it allows it
+# to be created after both
+resource "aws_security_group_rule" "extra_rule1" {
+  security_group_id        = "${aws_security_group.private_elb.id}"
+  from_port                = 80
+  to_port                  = 80
+  protocol                 = "tcp"
+  type                     = "egress"
+  source_security_group_id = "${aws_security_group.private.id}"
+}
+```
+A **load balancer** is a device that distributes network or application traffic across a cluster of servers. Load balancing improves responsiveness and increases availability of applications.
+This security group is for an internal-facing/private loadbalancer which serves the backend instance. This security group allows http traffic from instances in the VPC. This way the **backend** can only be accessed from the **private loadbalancer** and it in turn can only be accessed from within the VPC.
+
+**Public loadbalancer**
+
+```
+resource "aws_security_group" "public_elb" {
+  name        = "sendit_public_elb_sg"
+  description = "Security group for the public Elastic load balancer"
+
+  # inbound traffic
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  vpc_id = "${aws_vpc.main.id}"
+
+  tags = {
+    Name = "sendit_public_elb_sg"
+  }
+}
+
+resource "aws_security_group_rule" "extra_rule2" {
+  security_group_id        = "${aws_security_group.public_elb.id}"
+  from_port                = 80
+  to_port                  = 80
+  protocol                 = "tcp"
+  type                     = "egress"
+  source_security_group_id = "${aws_security_group.public.id}"
+}
+```
+This loadbalancer serves the frontend application and allows traffic to and fro anywhere.
+
+**NAT instance**
+
+```
+resource "aws_security_group" "nat" {
+    name = "sendit_vpc_nat"
+    description = "Allow traffic to pass from the private subnet to the internet"
+
+    ingress {
+        from_port = 80
+        to_port = 80
+        protocol = "tcp"
+        cidr_blocks = ["${var.cidr_private_subnet}"]
+    }
+    ingress {
+        from_port = 443
+        to_port = 443
+        protocol = "tcp"
+        cidr_blocks = ["${var.cidr_private_subnet}"]
+    }
+    ingress {
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    ingress {
+      from_port = -1
+      to_port = -1
+      protocol = "icmp"
+      cidr_blocks = ["${var.cidr_private_subnet}"]
+    }
+
+
+    egress {
+        from_port = 80
+        to_port = 80
+        protocol = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+    egress {
+        from_port = 443
+        to_port = 443
+        protocol = "tcp"
+        cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    egress {
+      from_port = 22
+      to_port = 22
+      protocol = "tcp"
+      cidr_blocks = ["${var.cidr_vpc}"]
+    }
+
+    egress {
+      from_port   = -1
+      to_port     = -1
+      protocol    = "icmp"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+
+    vpc_id = "${aws_vpc.main.id}"
+
+    tags {
+        Name = "sendit_nat_sg"
     }
 }
 ```
-Replace sendit-ah.gq and www.sendit-ah.gq in the block above with your own domain and subdomain names.
+The **NAT instance** security group allows traffic from the private subnet and sends it out to the internet but doesn't allow traffic into the priavte subnet.
 
-7) Export your environment variables (AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY) by running these commands in your terminal: 
-- `export AWS_ACCESS_KEY_ID="your_aws_access_key"`
-- `export AWS_SECRET_ACCESS_KEY="your_aws_secret_key"`
-8) Proceed to build your AMI with the packer.json file: `packer build packer.json`
-9) In the end, if all goes well, you should see the newly created AMI in your AWS EC2 dashboard under **AMIs**
+### NAT instance
+This file creates an instance from the AMI which would have been built with packer earlier. It is assigned a **public address**, put in the **public subnet** and given its own **security group**.
 
-Secondly, we launch our newly created AMI to host our app.
-## Setting up an EC2 instance
-1) Log in to your AWS dashboard and click on the **Services** tab which would display a dropdown of several options. Click on **EC2**.
-2) On the EC2 dashboard, look for a blue button that says **Launch Instance** and click on it. This would begin a dialog of options from which you would choose the one that best suits you.
-3) After clicking on the **Launch Instance** button, you would be required to choose an **Amazon Machine Image (AMI)** which is like a pre-configured operating system. For the purpose of this activity, I chose the newly created AMI from the steps above. This can be found under the tab **my AMIs**. If there are a lot of AMIs you can filter by searching for SENDIT(this is the name of the AMI we created earlier).
-4) Next, you'd be required to choose the Instance type that you prefer. This determines the processor type and speed, memory size, etc. Choose the one which best suits you, however since I am not deploying a large scale application, I chose the **t2 micro**. Click on **next: configure instance details**.
-5) In this step, you can customize details of your instance to your satisfaction or you can go ahead and leave it at the default values as I did. When done, click on **next: add storage**.
-6) Here you can customize the amount of storage you would need depending on your application size and requirements. Go ahead and leave it in the default values if you want. Click **next: add tags**.
-7) You can choose to add a tag/tags (name) to your instance or leave it if you want. Click on **next: configure security group**.
-8) In this step, you configure the type of inbound and outbound traffic you want in your instance. You can specify ports that you want to accept traffic or not, you can specify Ip addresses that can access your instance, etc. If you do not have an already existing security group that suits your needs, go ahead and click on **create new security group** and then on **add rule**. For the purpose of this activity, I am adding three rules:
-- type: HTTP, protocol: TCP, port: 80, source: custom
-- type: Custom TCP, protocol: TCP, port: 3000, source: anywhere (this port is for my application)
-- type: HTTPS, protocol: TCP, port: 443, source: custom
-9) After this click on **review and launch** and then **launch** to create and start your instance. You would be asked to either create a key pair file or use an existing on. Please download and keep this file safe and secure as you cannot download it again and it is what you would use to SSH into your instance.
-10) When your instance is up and running, you can access it with its public IP address. Here we see that we don't need to type the port **3000** to access our application. This is because we already have our **Nginx** configured to proxy pass HTTP requests to the port 3000. We also see that we didn't need to SSH into our instance to start the app, it was already started. This was achieved with the help of **PM2** which starts our app in the background and makes sure it is always started and running. 
+### Elastic Load balancer
+This file creates two loadbalancers, one priavte load balancer for the private subnet and one public load balancer for the public subnet, associates them with their respective instances and configures the **listener** and **health checks**.
 
-## Linking your Domain name to your instance with Route 53
-Now that you can access your app through the public IP of your instance, it would be even better to have a domain name instead of an IP address. The next step is to link your domain name to your instance.
-1) Go to https://console.aws.amazon.com/route53/home? to access the route 53 dashboard.
-2) Click on **create hosted zone** to create a hosted zone for your domain name. Enter your domain name in the dialog to your right and click on **create**.
-3) Click on the hosted zone that you just created and then click on **create record set** to create a record that would link your domain or sub-domain to your instance.
-4) In the dialog to your right, enter the sub-domain that you want to link under name, e.g: `wwww`, `app.`, etc. If you do not want to link a sub-domain, just leave that field empty.
-5) Under **value**, input the public IP address of your instance. It is advised to use an **elastic IP** as they do not change when your instance is stopped and restarted unlike the random public IP addresses assigned to the instance.
-6) You can create as many records as you need and you can test them to ensure everything went fine.
-7) Lastly, copy the **name servers** assigned to your hosted zone and put them as the **name servers** in your domain.
-8) You can now access your app from your domain name, however, our site is not secure because we haven't obtained and installed SSL certificates.
+### Data
+The data used to source for the ami that was created with packer, is specified in this file. Filters are used to filter by **name** from a list of AMIs owned by the account specified in `owners`. The AMIs gotten are then used to launch the various instances.
 
-## Obtaining and Installing SSL certificates.
-1) To SSH (login in lay man's terms) into your instance, click on the instance in your EC2 dashboard and click on connect. Copy the command after **Example** e.g: ssh -i "path_to_pem_key_pair_file.pem" ubuntu@instance_public_dns.
-2) When logged in, run this command `sudo certbot --nginx --email EXAMPLE@YAHOO.COM --agree-tos --no-eff-email -d DOMAINNAME` replacing the variables with your email and the domain names that you want to install the SSL certificates for. Choose 2 to redirect all HTTP traffic to HTTPS when prompted. N/b: the variables to be substituted are in capital letters.
-3) After running the command, when you view your site it would be secure evident from the **https** prefix in your URL.
+### Instances
+This file creates the various instances from the AMIs built earlier with packer. It assigns them to the **VPC** and to their respective **subnets** and **security groups**.
 
-Congratulations, you have successfully created a provisioned AMI, launched it, linked it to a domain name and installed SSL certificates for your site!!
+## Getting started
+1) Install **packer** and **terraform**.
+2) In the `terraform` folder, create a `terraform.tfvars` file that contains your `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `key_pair` in this format:
+
+```
+AWS_ACCESS_KEY_ID = "**********"
+AWS_SECRET_ACCESS_KEY = "************"
+key_pair = "************"
+```
+3) In the **root directory**, create a `variables.json` file. This file would contain the variables that packer would use to build the AMIs.
+
+```
+{
+  "aws_access_key": "**********",
+  "aws_secret_key": "**********"
+}
+```
+4) After creating the needed variable files for packer and terraform, `cd` into the **scripts** directory by running `cd scripts`
+5) Run `chmod +x deploy.sh` to make the `deploy.sh` script executable.
+6) Proceed to run the script that automates all the process of building the AMIs and building the infrastructure by running `./deploy.sh`.
+
+At the end of the script if all goes well, you would have four AMIs built and all your terraform resources built on AWS.
+The frontend application can be accessed from the **public laodbalancer** and the backend from the **private laodbalancer** 
+Congratulations, you have successfully deployed an application to a VPC on AWS.
+
+
 
 
 
