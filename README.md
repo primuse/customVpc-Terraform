@@ -12,9 +12,13 @@ This repository automates the creation of a VPC(Virtual Private Cloud), a Public
 In this repo, there are four packer files, for the frontend, backend, database and NAT instance respectively. These packer files are used to build and provision the AMIs we would use as base images for our instances.
 
 ### Packer file for the database 
+![database.json](assets/database.png)
+
 This file builds an AMI for the database instance and provisons it with the `postgres.yml` file found in the **ansible** folder. The `postgres.yml` file installs postgres (the database the application uses), creates a new database and edits the configuration file to allow remote connections to the database.
 
 ### Packer file for the frontend
+![frontend.json](assets/frontend.png)
+
 This file builds an AMI for the frontend instance and provisons it with the `frontend.yml` file found in the **ansible** folder. The `frontend.yml` file updates the Ubuntu AMI, clone the repo hosting the frontend app and installs some necessary packages like nodejs, certbot, pm2, etc. I included several descriptive comments in the playbook to explain each task and what it does.
 The packages installed are:
 - [PM2](https://www.npmjs.com/package/pm2) is a process manager for the JavaScript runtime Node.js. It allows you to keep applications alive forever, to reload them without downtime and to facilitate common system admin tasks. I chose this because my application is written with nodeJs and javascript.
@@ -23,17 +27,25 @@ The packages installed are:
 - [Nginx](https://www.linode.com/docs/web-servers/nginx/use-nginx-reverse-proxy/) A reverse proxy is a server that sits between internal applications and external clients, forwarding client requests to the appropriate server. While many common applications, such as Node.js, are able to function as servers on their own, NGINX has a number of advanced load balancing, security, and acceleration features that most specialized applications lack. Using NGINX as a reverse proxy enables you to add these features to any application.
 
 ### Packer file for the backend
+![api.json](assets/api.png)
+
 This file builds an AMI for the frontend instance and provisons it with the `api.yml` file found in the **ansible** folder. The `api.yml` file updates the Ubuntu AMI, clone the repo hosting the backend app and installs the same packages as with the frontend application.
 
 ### Packer file for the NAT instance
+![nat.json](assets/nat.png)
+
 This file builds an AMI for the NAT instance and provisons it with the `nat.sh` script found in the **scripts** folder. The `nat.sh` file enables **IPv4 forwarding** and **Masquerade** for this instance. This is necessary to enable this instance serve as a **NAT gateway**, forwarding traffic from instances in a private subnet to the iternet but not allowing traffic from the internet to the private subnet.
 
 After the AMIs have been built and provisioned, **terraform** is used to automatically build our infrastructure. Terraform configuration is described using a high-level configuration syntax. The terraform configurations can be found in the **terraform** folder.
 
 ### Variables file
+![variables.tf](assets/variables.png)
+
 This file holds all the variables used by this terraform configuration. It also provides a default value that is used if no value was provided. The `AWS_ACCESS_KEY_ID` and the `AWS_SECRET_ACCESS_KEY` variables hold the aws authentication keys of the aws account you want to use to build your infrastructure.
 
 ### Vpc file
+![vpc.tf](assets/vpc.png)
+
 This file holds configurations used to create a **VPC**- A Virtual Private Cloud (VPC) lets you provision a logically isolated section of the AWS Cloud where you can launch AWS resources in a virtual network that you define. It also holds the configuration that creates the **private** and **public** subnet. A subnet is a logical partition of an IP network into multiple, smaller network segments. It is typically used to subdivide large networks into smaller, more efficient subnetworks. Route tables are also created to define how traffic would be routed from each subnet. Traffic from the Public subnet would be routed to the **internet gateway** while traffic from the Private subnet routed to the **NAT instance**. **Route table associations** are used to associate each route table to a specific subnet. All these configurations are declared and described in this file. *There are descriptive comments that would help you understand each code block*.
 
 ### Security groups
@@ -339,15 +351,23 @@ resource "aws_security_group" "nat" {
 The **NAT instance** security group allows traffic from the private subnet and sends it out to the internet but doesn't allow traffic into the priavte subnet.
 
 ### NAT instance
+![nat2.tf](assets/nat2.png)
+
 This file creates an instance from the AMI which would have been built with packer earlier. It is assigned a **public address**, put in the **public subnet** and given its own **security group**.
 
 ### Elastic Load balancer
+![elb.tf](assets/elb.png)
+
 This file creates two loadbalancers, one priavte load balancer for the private subnet and one public load balancer for the public subnet, associates them with their respective instances and configures the **listener** and **health checks**.
 
 ### Data
+![data.tf](assets/data.png)
+
 The data used to source for the ami that was created with packer, is specified in this file. Filters are used to filter by **name** from a list of AMIs owned by the account specified in `owners`. The AMIs gotten are then used to launch the various instances.
 
 ### Instances
+![instances.tf](assets/instances.png)
+
 This file creates the various instances from the AMIs built earlier with packer. It assigns them to the **VPC** and to their respective **subnets** and **security groups**.
 
 ## Getting started
